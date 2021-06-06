@@ -1,0 +1,46 @@
+version: '3.9'
+services:
+    frontend:
+        build:
+            context: ./frontend
+        command: yarn start
+        ports:
+            - 3000:3000
+        volumes:
+            - ./frontend/:/usr/src/frontend/
+            - /usr/src/frontend/node_modules/
+        depends_on: 
+            - backend
+    backend:
+        build:
+            context: ./backend
+        command: python manage.py runserver 0.0.0.0:8000
+        ports:
+            - 8000:8000
+        volumes:
+            - ./backend/:/usr/src/backend/
+        environment:
+            - SECRET_KEY=secretkeydoesntmatterindevmode
+            - DEBUG=1
+            - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] backend
+            - CORS_ALLOWED_ORIGINS=http://frontend
+            - CSRF_TRUSTED_ORIGINS=frontend
+            - SQL_ENGINE=django.db.backends.postgresql
+            - SQL_DATABASE=backend_dev
+            - SQL_USER=backend
+            - SQL_PASSWORD=backenddevpassword
+            - SQL_HOST=db
+            - SQL_PORT=5432
+        depends_on: 
+            - db
+    db:
+        image: postgres:13-alpine
+        volumes:
+            - postgres_data:/var/lib/postgresql/data/
+        environment:
+            - POSTGRES_USER=backend
+            - POSTGRES_PASSWORD=backenddevpassword
+            - POSTGRES_DB=backend_dev
+    
+volumes:
+    postgres_data:
