@@ -1,14 +1,13 @@
 /* App.js */
 
 import {
-  BrowserRouter as Router,
-  Switch,
-  Route,
-  Redirect
+    BrowserRouter as Router,
+    Switch,
+    Route,
+    Redirect
 } from 'react-router-dom';
 import { useAuth, ProvideAuth } from './auth/use-auth';
 
-// Import pages
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import LogoutPage from './pages/LogoutPage';
@@ -16,7 +15,9 @@ import RegisterPage from './pages/RegisterPage';
 import AccountPage from './pages/AccountPage';
 import CreatePage from './pages/CreatePage';
 
-
+/**
+ * Main App component rendered by index.js
+ */
 function App() {
     return (
         <ProvideAuth>
@@ -25,12 +26,12 @@ function App() {
                     <Route exact path="/">
                         <HomePage />
                     </Route>
-                    <GuestOnlyRoute exact path="/login">
+                    <Route exact path="/login">
                         <LoginPage />
-                    </GuestOnlyRoute>
-                    <GuestOnlyRoute exact path="/register">
+                    </Route>
+                    <Route exact path="/register">
                         <RegisterPage />
-                    </GuestOnlyRoute>
+                    </Route>
                     <AuthenticatedRoute exact path="/account">
                         <AccountPage />
                     </AuthenticatedRoute>
@@ -60,24 +61,6 @@ function AuthenticatedRoute({ children, ...rest }) {
             auth.user ? (children) : (redirect(location))
         }
     />
-    );
-}
-
-/**
- * Route wrapper to redirect users away from page if already authenticated
- */
-function GuestOnlyRoute({ children, ...rest }) {
-    const auth = useAuth();
-    console.log('guestonly', auth.user)
-    const redirect = (location) => (
-        <Redirect to={ { pathname: '/', state: { from: location } } } />
-    );
-    return (
-        <Route
-            render={({ location }) => 
-                auth.user ? (redirect(location)) : (children)
-            }
-        />
     );
 }
 

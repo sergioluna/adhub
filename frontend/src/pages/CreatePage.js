@@ -1,4 +1,5 @@
-/* Create.js */
+/* CreatePage.js */
+
 import Navbar from '../components/Navbar';
 
 function CreatePage() {

@@ -99,7 +99,7 @@ function AccountMenuDropdown(props) {
     return (
         <div className="dropdown">
             <button className="btn btn-light dropdown-toggle text-primary" type="button" id="accountMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                { auth.user ? auth.user : 'My Account' }
+                { auth.user ? auth.user.username : 'My Account' }
             </button>
             <ul className="dropdown-menu" aria-labelledby="accountMenuDropdown">
                 {Object.keys(links).map((key) => 

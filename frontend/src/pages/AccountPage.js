@@ -1,3 +1,5 @@
+/* AccountPage.js */
+
 import Navbar from '../components/Navbar';
 
 function AccountPage() {
