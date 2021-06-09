@@ -47,6 +47,73 @@ export function ProvideAuth({ children }) {
 function useProvideAuth() {
     const [user, setUser] = useState();
 
+    const _isLoggedIn = () => {
+        return user ? true : false;
+    }
+
+    const _isNotLoggedIn = () => {
+        return !_isLoggedIn();
+    }
+
+    const _getAccessToken = async () => {
+        if (_isNotLoggedIn()) {
+            return null;
+        }
+        try {
+            const response = await fetch('/api/token/refresh/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({refresh: user.jwt_refresh})
+            });
+            if (response.ok) {
+                const jsonResponse = await response.json();
+                return jsonResponse.access;
+            }
+            return null;
+        }
+        catch (error) {
+            console.error("Server error", error);
+            return null;
+        }
+    }
+
+    /**
+     * Function: authenticatedRequest
+     * 
+     * Makes an authenticated request to the provided url with the 
+     * provided data
+     */
+    const authenticatedRequest = async (url, options) => {
+        const accessToken = await _getAccessToken();
+        if (!accessToken) {
+            signout(() => {
+                console.error("User was logged out.");
+            });
+        }
+        if (!options) {
+            options = {
+                headers: {'Authorization': null}
+            }
+        } 
+        const requestObject = {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': 'Bearer ' + accessToken
+            }
+        };
+        try {
+            const response = await fetch(url, requestObject);
+            return response;
+        }
+        catch (error) {
+            console.log(error);
+            return null;
+        }
+    }
+
     /**
      * Function: refreshJWT
      * 
@@ -178,6 +245,7 @@ function useProvideAuth() {
 
     return {
         user,
+        authenticatedRequest,
         refreshJWT,
         signin,
         signup,
