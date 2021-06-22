@@ -26,8 +26,8 @@ export function ProvideAuth({ children }) {
     const auth = useProvideAuth();
 
     useEffect(() => {
-        if (localStorage.getItem("user")) {
-            auth.refreshJWT();
+        if (localStorage.getItem("refresh_token")) {
+            auth.refreshAccessTokens();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
@@ -47,56 +47,27 @@ export function ProvideAuth({ children }) {
 function useProvideAuth() {
     const [user, setUser] = useState();
 
-    const _isLoggedIn = () => {
-        return user ? true : false;
-    }
-
-    const _isNotLoggedIn = () => {
-        return !_isLoggedIn();
-    }
-
-    const _getAccessToken = async () => {
-        if (_isNotLoggedIn()) {
-            return null;
-        }
-        try {
-            const response = await fetch('/api/token/refresh/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({refresh: user.jwt_refresh})
-            });
-            if (response.ok) {
-                const jsonResponse = await response.json();
-                return jsonResponse.access;
-            }
-            return null;
-        }
-        catch (error) {
-            console.error("Server error", error);
-            return null;
-        }
-    }
-
     /**
-     * Function: authenticatedRequest
+     * Function: authenticatedFetch
      * 
      * Makes an authenticated request to the provided url with the 
-     * provided data
+     * provided data. Reattempts request if it orignially returns 401.
      */
-    const authenticatedRequest = async (url, options) => {
-        const accessToken = await _getAccessToken();
+    const authenticatedFetch = async (url, options) => {
+        // get access token form localStorage
+        const accessToken = localStorage.getItem("access_token")
+        // if no access token, logout (will redirect)
         if (!accessToken) {
             signout(() => {
                 console.error("User was logged out.");
             });
+            return null;
         }
+        // set null headers for ... syntax on next variable declaration
         if (!options) {
-            options = {
-                headers: {'Authorization': null}
-            }
-        } 
+            options = { headers: { } };
+        }
+        // construct request object with provided options and access token
         const requestObject = {
             ...options,
             headers: {
@@ -105,7 +76,30 @@ function useProvideAuth() {
             }
         };
         try {
+            // try request and get response
             const response = await fetch(url, requestObject);
+            // if unauthorized (access token expired) try again with new tokens
+            if (response.status === 401 && 
+                response.statusText === 'Unauthorized'){
+                    // update access tokens in localStorage
+                    await this.refreshAccessTokens();
+                    const newAccessToken = localStorage.getItem("access_token");
+                    // throw error if refreshAccessToken fails (will log out)
+                    if (!newAccessToken) {
+                        throw new Error('User has been logged out');
+                    }
+                    // create new requestObject with updated access tokens
+                    const updatedRequestObject = {
+                        ...requestObject,
+                        headers: {
+                            ...requestObject.headers,
+                            'Authorization': 'Bearer ' + newAccessToken
+                        }
+                    };
+                    // attempt request again and return response
+                    const newResponse = await fetch(url, updatedRequestObject);
+                    return newResponse;
+                }
             return response;
         }
         catch (error) {
@@ -115,16 +109,16 @@ function useProvideAuth() {
     }
 
     /**
-     * Function: refreshJWT
+     * Function: refreshAccessTokens
      * 
-     * Sends POST request to /api/token/refresh/ with refresh token stored
-     * in localStorage. 
-     * Stores new access token in localStorage and keeps user signed in 
-     * upon success.
-     * Signs user out upon failure.
+     * Will refresh tokens in localStorage and set user with a POST request
+     * to /api/token/refresh/
+     * In case of failure, removes user from state and clears localStorage
+     * (logging the user out)
      */
-    const refreshJWT = async () => {
-        const userObjectInStorage = JSON.parse(localStorage.getItem("user"));
+    const refreshAccessTokens = async () => {
+        const usernameInStorage = localStorage.getItem("user");
+        const refreshTokenInStorage = localStorage.getItem("refresh_token")
         try {
             const response = await fetch('/api/token/refresh/', {
                 method: 'POST',
@@ -132,29 +126,23 @@ function useProvideAuth() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    'refresh': userObjectInStorage.jwt_refresh
+                    'refresh': refreshTokenInStorage
                 })
             });
             if (response.ok) {
                 const jsonResponse = await response.json();
-                setUser(() => {
-                    const newUserObject = {
-                        ...userObjectInStorage,
-                        jwt_access: jsonResponse.access
-                    }
-                    localStorage.setItem("user", JSON.stringify(newUserObject));
-                    return newUserObject
-                });
+                localStorage.setItem("access_token", jsonResponse.access)
+                localStorage.setItem("refresh_token", jsonResponse.refresh)
+                setUser(() => ({username: usernameInStorage}));
             }
             else {
-                setUser(null);
-                localStorage.removeItem('user')
+                throw new Error('Could not refresh access token.')
             }
     
         } catch (error) {
             console.log(error)
             setUser(null);
-            localStorage.removeItem('user');
+            localStorage.clear();
         }
     }
 
@@ -181,15 +169,10 @@ function useProvideAuth() {
             });
             if (response.ok) {
                 const jsonResponse = await response.json();
-                const userObject = {
-                    username: username,
-                    jwt_access: jsonResponse.access,
-                    jwt_refresh: jsonResponse.refresh
-                };
-                setUser(() => {
-                    localStorage.setItem("user", JSON.stringify(userObject));
-                    return userObject;
-                });
+                localStorage.setItem("user", username);
+                localStorage.setItem("access_token", jsonResponse.access);
+                localStorage.setItem("refresh_token", jsonResponse.refresh);
+                setUser(() => ({username: username}));
                 onSuccess();
             }
             else {
@@ -239,14 +222,14 @@ function useProvideAuth() {
      */
     const signout = (callback) => {
         setUser(null);
-        localStorage.removeItem('user');
+        localStorage.clear();
         callback();
     }
 
     return {
         user,
-        authenticatedRequest,
-        refreshJWT,
+        authenticatedFetch,
+        refreshAccessTokens,
         signin,
         signup,
         signout
